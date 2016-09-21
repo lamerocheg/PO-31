@@ -325,3 +325,18 @@ SELECT список_полей
 * Like `поле LIKE шаблон`
 
  используется только в символьных полях
+
+* IS NULL  
+
+при сравнении значений null с не null  не true / false , а  unknown == false
+
+студенты без руководителя дипломной:
+```SQL
+ SELECT * from СТУДЕНТ spdp is null
+```
+
+студенты с руководителем дипломной:
+```SQL
+ SELECT * from СТУДЕНТ spdp is not null
+```
+
