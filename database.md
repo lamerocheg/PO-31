@@ -245,12 +245,12 @@
 
 | onum | opnum | osnum | odate | ocen |
 |------|-------|-------|-------|------|
-|   1  |   1   |   1   |       |  10  |
-|   2  |   1   |   2   |       |   8  |
-|   3  |   1   |   3   |       |   6  |
-|   4  |   3   |   1   |       |  10  |
-|   5  |   3   |   3   |       |   2  |
-|   6  |   3   |   3   |       |   4  |
+|   1  |   1   |   1   | 10/01 |  10  |
+|   2  |   1   |   2   | 11/01 |   8  |
+|   3  |   1   |   3   | 10/01 |   6  |
+|   4  |   3   |   1   | 15/01 |  10  |
+|   5  |   3   |   3   | 16/01 |   2  |
+|   6  |   3   |   3   | 20/01 |   4  |
 
 #### общий формат
 ```SQL
@@ -600,3 +600,50 @@ WHERE pnum <> ALL (SELECT spdp FROM СТУДЕНТ)
 > `NOT IN` эквивалентно `<> ALL`
 
 
+## Связанный подзапрос
+связанным подзапросом наывается подзапрос который использует значения из основного запроса
+
+Студенты сдававшие экзамен 11 января : 
+```SQL
+ SELECT sname from СТУДЕНТ WHERE snum IN (SELEC osnum from ОЦЕНКА WHERE odate = '11/01')
+ 
+ SELECT sname from СТУДЕНТ WHERE '11/01' IN (SELECT odate FROM ОЦЕНКА WHERE osnum = snum)
+```
+> как работает 2 выриант : выполняется цикл по записям основного запроса, для каждой такой записи выполняется подзапрос, результат оценивается и на основании этого запись основного запроса включается или нет в результат
+
+Получить фамилии студентов у которых средний балл ниже чем общий средний балл в их группе: 
+```SQL
+ SELECT sname from СТУДЕНТ as C , ОЦЕНКА 
+ WHERE osnum = snum 
+ GROUP BY  sname, snum , sgrp
+ Having avg(ocen) < (SELECT avg(ocen) FROM ОЦЕНКА  where osnum IN(SELECT snum from СТУДЕНТ where sgrp = C.sgrp))
+```
+## Оператор EXISTS(существует) 
+формат : exists(подзвапрос) возвращается истина если результат подзапроса не пуст
+
+студенты сдававшие экзамен 11 января :
+```SQL
+ SELECT sname from СТУДЕНТ where EXISTS(SELECT * FROM ОЦЕНКА where odate = '11/01' and and snum = osnum)
+```
+преподаватели у которых все дипломники не имеют удовлетворительных оценок : 
+```SQL
+ SELECT pname  FROM ПРЕПОДАВАТЕЛЬ WHERE NOT exists(SELECT * FROM СТУДЕНТ WHERE spdp =  pnum and exists(SELECT * FROM ОЦЕНКА where snum = osnum and ocen < 4))
+```
+преподаватели у которых ровно 1 дипломник ^ 
+```SQL
+ SELECT pname FROM ПРЕП where exists(select * from СТУДЕНТ c spdp = pnum and not exists(select * from CТУДЕНТ where spdp = pnum and snum <> c.snum ))
+```
+## Объединение результатов запроса 
+формат : 
+```
+запрос 1
+union [all]
+запрос 2
+```
+получить коды и фамилии руководителей дипломов и дипломников :
+```SQL
+ SELECT pnum as "код" , pname as 'фио' , "п" as "тип" FROM преп where pnum in (select spdp from студ)
+ UNION
+ SELECT snum , sname , 'c' FROM СТУДЕНТ where spdp is not null
+```
+union удаляет повторы, что бы не удалять пишется `UNION ALL `
