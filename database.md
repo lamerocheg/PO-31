@@ -646,4 +646,108 @@ union [all]
  UNION
  SELECT snum , sname , 'c' FROM СТУДЕНТ where spdp is not null
 ```
-union удаляет повторы, что бы не удалять пишется `UNION ALL `
+union удаляет повторы, что бы не удалять пишется `UNION ALL`
+
+union позволяет избавиться от LEFT JOIN
+пример: получить фамилии всех студентов. для дипломников указать руководителей
+
+с LEFT JOIN
+```SQL
+  SELECT sname, pname
+  FROM СТУДЕНТ LEFT JOIN ПРЕПОДАВАТЕЛЬ ON spdp = pnum
+```
+
+c UNION
+```SQL
+  SELECT sname, pname
+  FROM СТУДЕНТ INNER JOIN ПРЕПОДАВАТЕЛЬ ON spdp = pnum
+  UNION ALL
+  SELECT sname, NULL
+  FROM СТУДЕНТ
+  WHERE spdp IS NULL
+```
+
+> ORDER BY указывается после всех объединяемых запросов
+
+задача: получить сведения об успеаемости в том числе оценки студентов, их средние баллы, 
+средние баллы по группам и общий средний балл.
+
+```SQL
+  SELECT sgrp, sname, odate, ocen, 0 AS s1, 0 AS s2, 0 AS s3
+  FROM СТУДЕНТ, ОЦЕНКА
+  WHERE snum = osnum
+  
+  UNION ALL
+  
+  SELECT sgrp, sname, NULL, AVG(ocen), 0, 0, 1
+  FROM СТУДЕНТ, ОЦЕНКА
+  WHERE snum = osnum
+  GROUP BY snum, sname, sgrp
+  
+  UNION ALL
+  
+  SELECT sgrp, NULL, NULL, AVG(ocen), 0, 1, 0
+  FROM СТУДЕНТ, ОЦЕНКА
+  WHERE snum = osnum
+  GROUP BY sgrp
+  
+  UNION ALL
+  
+  SELECT 'Итого', NULL, NULL, AVG(ocen), 1, 0, 0
+  FROM ОЦЕНКА
+  
+  ORDER BY s1, sgrp, s2, sname, s3, odate
+```
+
+## Операторы модификации данных
+
+* INSERT
+* UPDATE
+* DELETE
+
+#### INSERT
+Добавление записей.
+
+INSERT INTO Таблица (Список полей) VALUES (Список значений) 
+
+пример: 
+```SQL
+  INSERT INTO СТУДЕНТ VALUES (5, 'C-5', 'Г-1', 3)
+  INSERT INTO СТУДЕНТ (sgrp, sname) VALUES ('Г-1', 'C-6')
+```
+
+Добавление из подзапроса:
+INSERT INTO Таблица (Список полей) SELECT-ПОДЗАПРОС
+
+Студентов дипломников. имеющих средний бал выше девяти сделать преподавателями на тех кафедрах
+где работают их руководители
+
+
+```SQL
+  INSERT INTO ПРЕПОДАВАТЕЛЬ (pname, pcaf) SELECT sname, pcaf 
+                                          FROM СТУДЕНТ, ПРЕПОДАВАТЕЛЬ 
+                                          WHERE spdp = pnum AND 
+                                                snum IN (
+                                                  SELECT osnum
+                                                  FROM ОЦЕНКА
+                                                  GROUP BY osnum
+                                                  HAVING AVG(ocen) > 9
+                                                )
+```
+
+#### UPDATE
+Изменение записей.
+
+UPDATE Таблица SET поле1 = значение1 {, поле2 = значение2} {WHERE условие}
+
+Оценки преподавателя П-3 увеличить на один балл
+
+```SQL
+  UPDATE ОЦЕНКА SET ocen = ocen + 1 WHERE opnum = (SELECT pnum FROM ПРЕПОДАВАТЕЛЬ WHERE pname = 'П-3') AND ocen < 10
+```
+
+Всех дипломников преподавателя П-1 передать преподавателю с кодом 3.
+
+```SQL
+  UPDATE СТУДЕНТ SET spdp = 3 WHERE spdp = (SELECT pnum FROM ПРЕПОДАВАТЕЛЬ WHERE pname = 'П-1')
+```
