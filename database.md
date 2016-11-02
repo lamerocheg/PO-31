@@ -738,16 +738,274 @@ INSERT INTO Таблица (Список полей) SELECT-ПОДЗАПРОС
 #### UPDATE
 Изменение записей.
 
-UPDATE Таблица SET поле1 = значение1 {, поле2 = значение2} {WHERE условие}
+```SQL
+UPDATE Таблица SET поле1 = значение1 [, поле2 = значение2] [WHERE условие]
+```
 
 Оценки преподавателя П-3 увеличить на один балл
 
 ```SQL
-  UPDATE ОЦЕНКА SET ocen = ocen + 1 WHERE opnum = (SELECT pnum FROM ПРЕПОДАВАТЕЛЬ WHERE pname = 'П-3') AND ocen < 10
+UPDATE ОЦЕНКА SET ocen = ocen + 1 WHERE opnum = (SELECT pnum FROM ПРЕПОДАВАТЕЛЬ WHERE pname = 'П-3') AND ocen < 10
 ```
 
 Всех дипломников преподавателя П-1 передать преподавателю с кодом 3.
 
 ```SQL
-  UPDATE СТУДЕНТ SET spdp = 3 WHERE spdp = (SELECT pnum FROM ПРЕПОДАВАТЕЛЬ WHERE pname = 'П-1')
+UPDATE СТУДЕНТ SET spdp = 3 WHERE spdp = (SELECT pnum FROM ПРЕПОДАВАТЕЛЬ WHERE pname = 'П-1')
+```
+
+#### DELETE
+Удаление строки таблицы.
+
+```SQL
+DELETE FROM Таблица 
+[WHERE Условие]
+```
+
+Пример:
+удалить оценки студента С-3
+
+```SQL
+DELETE FROM Оценка
+WHERE snum = (SELECT snum from Студент WHERE sname = 'C-3')
+```
+
+#### TRUNCATE
+Оператор очистки таблицы. (Не поддерживается в Access)
+
+```SQL
+TRANCATE TABLE Таблица
+```
+
+# Microsoft SQL Server
+
+Имя сервера: VAK-DB\SQLExpress
+Имя базы: StudTraining
+
+#### Из Access в MS SQL Server
+`
+Вкладка Таблицы -> Export -> (Тип данных: ODBC-источник) -> mdb -> 
+Создать -> Выбрать сервер -> VAK-DB\SQLExpress -> StudTraining
+`
+
+## Расширения языка SQL в MS SQL Server
+
+#### Расширения в операторе Select
+
+```SQL
+SELECT TOP число[PRCNT] [WITH TIES]
+```
+
+Пример:
+получить средние баллы студентов
+
+```SQL
+SELECT TOP 1 osnum, AVG(ocen) as AVGO
+FROM Оценка
+GROUP BY osnum
+ORDER BY AVG(ocen), osnum DESC
+```
+
+`WITH TIES`
+в результат входят дополниельные записи,
+которые в соответствии с условиями сортировки совпадают с последней отобранной записью.
+
+
+#### Создание таблиц с помощью SELECT
+```SQL
+SELECT поля INTO таблица [FROM] ...
+```
+
+Результат запроса помещаются в таблицу.
+
+```SQL
+SELECT osnum, AVG(ocen) as avgo INTO СредБал
+FROM Оценка
+GROUP By osnum
+```
+
+#### Использование подзапросов в списке полей
+Подзапрос обычно является связанным и должен возвращать не больше одного значения.
+
+Получить фамилии студентов и их сдрений балл.
+```SQL
+SELECT sname, (SELECT AVG(ocen) FROM оценка WHERE osnum = snum) as avgo
+FROM Студент
+```
+
+#### Использование подзапросов как источников данных в предложении FROM
+
+Фамилии и средние баллы студентов
+
+```SQL
+SELECT sname, avgo 
+FROM Сдудент, (SELECT osnum, AVG(ocen) as avgo FROM Оценка GROUP BY osnum)
+WHERE snum = osnumr
+```
+
+#### Дополнительные вилы JOIN
+
+* INNER / LEFT / RIGHT
+* FULL
+* CROSS
+* NATURAL
+
+
+#### Расширения в операторе UPDATE
+
+```SQL
+UPDATE SET [поля]
+[FROM таблица]
+[WHERE условие]
+```
+
+Нужно получить таблицу следующей структуры:
+
+| СведенияОСтудентах |
+----------------------
+|      snum          |
+|      sname         |
+|      sgrp          |
+|      spdp          |
+|      avgo          |
+|      pname         |
+|      pcaf          |
+
+
+Пишем следующие запросы:
+
+```SQL
+INSERT INTO СВОС(snum, sname, sgrp, spdp)
+SELECT * FROM Студент
+```
+
+```SQL
+UPDATE СВОС avgo = (SELECT AVG(ocen) FROM Оценка WHERE osnum = snum)
+```
+
+```SQL
+UPDATE СВОС SET
+pname = (SELEC pname FROM ПРЕП WHERE pnum = spdp)
+pcaf = (SELEC pname FROM ПРЕП WHERE pnum = spdp)
+```
+
+Или так (С помощью UPDATE FROM в MS SQL):
+
+```SQL
+UPDATE СВОС SET pname = П.pname, pcaf = П.pcaf
+FROM ПРЕП AS П WHERE spdp = pnum
+```
+
+Или так, чтобы информация с NULL коректно обновлялась (UPDATE FROM в MS SQL)
+
+```SQL
+UPDATE СВОС SET pname = П.pname, pcaf = П.pcaf
+FROM СВОС LFET JOIN ПРЕП ON spdp = pnum AS П
+```
+
+#### Расширения в операторе DELETE
+```SQL
+DELETE [FROM] Таблица
+[FROM список_таблиц]
+[WHERE условие]
+```
+
+Пример(NON MS-SQL):
+```SQL
+DELETE FROM Оценка WHERE osnum = (SELECT snum FROM Студент WHERE sname='C-3')
+```
+
+(MS-SQL)
+```SQL
+DELETE FROM Оценка
+FROM Студент
+WHERE osnum = snum AND sname = 'C-3'
+```
+
+# Создание таблиц в MS-SQL сервер
+
+#### Оператор создания таблиц
+```SQL
+CREATE TABLE имя_таблицы
+(определение поля | определения вычисляемого поля | ограничения на таблицу) [, ...]
+[ON группа_файлов]
+[TEXTIMAGE_ON группа_файлов]
+```
+
+##### Определение поля
+`
+                              Значение по умолчанию для поля   Поле счётчик(от начала с шагом i)       Поле с уникальным значением
+                                                  \/                     \/                              \/
+имя тип[(длина)] [collate алф. сортировки] [DEFAULT выражение] [ [IDENTITY [(начало, инкремент)]] | [ROWGUIDCOL] ] [ограничения на столбец [,...]]
+`
+
+###### Ограничения на столбец
+```SQL
+NULL        | NOT NULL  
+PRIMARY KEY | UNIQUE  
+
+[FOREIGN KEY] REFERENCES родительская_таблица [(поле)]        \
+[ON DELETE { NO ACTION | CASCADE | SET NULL | SET DEFAULT }]   > -- определение внешнего ключа
+[ON UPDATE { NO ACTION | CASCADE | SET NULL | SET DEFAULT }]  /
+```
+
+`ON DELETE` определяет действие в данной таблице при удалении записи в данной таблице.
+* `NO ACTION` - запретить удаление
+* `CASCADE` - удалить данную запись вслед за записью
+* `SET NULL` - занести NULL в данную таблицу на место удалённой в другой таблице
+* `SET DEFAULT` - занести значение по умолчанию
+
+`CHECK(условие)` - условие, проверяющее значение поля.  // `CHECK(поле <= 10)` 
+
+###### Пример
+
+```SQL
+CREATE TABLE Преподаватель
+(
+  pnum  int PRIMARY KEY IDENTITY, 
+  pname varchar(40) NOT NULL,
+  pcaf  varchar(100)
+)
+
+GO
+
+CREATE TABLE Студент
+(
+  snum  int PRIMARY KEY IDENTITY,
+  sname varchar(40) NOT NULL,
+  sgrp  varchar(10),
+  spdp  int REFERENCES Преподаватель (pnum)
+           ON DELETE SET NULL
+)
+
+GO
+
+CREATE TABLE Оценка
+(
+  onum  int PRIMARY KEY IDENTITY,
+  opnum int NOT NULL REFERENCES Преподаватель (pnum)
+  osnum int NOT NULL REFERENCES Студент (snum)
+                     ON DELETE CASCADE
+  odate datetime NOT NULL,
+  ocen  int CHECK(ocen >= 1 AND ocen <= 10)
+)
+
+GO
+```
+
+#### Оператор уничтожения таблиц
+``SQL
+DROP TABLE имя_таблицы
+```
+
+Для нормального функционирования скрипта создания базы нужно дописать в начале DROP TABLE
+(Нельзя удалять родительские таблицы, поэтому удалять нужно в обратном порядке)
+
+```SQL
+DROP TABLE Оценка
+GO
+DROP TABLE Студент
+GO
+DROP TABLE Преподаватель
+GO
 ```
