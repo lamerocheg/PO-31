@@ -993,7 +993,7 @@ CREATE TABLE Оценка
 GO
 ```
 
-#### Оператор уничтожения таблиц
+##### Оператор уничтожения таблиц
 ``SQL
 DROP TABLE имя_таблицы
 ```
@@ -1009,3 +1009,132 @@ GO
 DROP TABLE Преподаватель
 GO
 ```
+
+##### Описание вычисляемого столбца
+```SQL
+описание_вычисляемого_столбца AS выражение
+```
+
+Пример:
+```SQL
+CREATE TABLE Tovar
+( ...
+  price money,
+  _count int,
+  cost AS price * _count
+)
+```
+
+###### Ограничение на таблицу
+
+```SQL
+[constraint имя_ограничения] 
+  PRIMARY KEY (столбец [, столбец])
+  UNIQUE (столбец [, стобец])
+  FOREIGN KEY (столбец [, стобец]) REFERENCES родительская_таблица [ON DELETE...] [ON UPDATE...]
+  CHECK (условие)
+```
+
+#### Модификация структуры таблицы
+
+```SQL
+ALTER TABLE имя_таблицы
+  ALTER COLUMN имя_стобца параметры
+  ADD COLUMN столбец [, ...]
+  ADD ограничение_на_таблицу
+  DROP COLUMN столбец [, ...]
+  DROP ограничение_на_таблицу
+```
+
+(Название связи -- FK_Дочерняя_Родительская)
+
+Удаление таблиц с удалением связей:
+```SQL
+  ALTER TABLE Студент DROP FK_Студ_Преп
+  GO
+  ALTER TABLE Оценка  DROP FK_Оценка_Преп, 
+                           FK_Оценка_Студ
+  
+  GO
+  
+  DROP TABLE Преподаватель
+  GO
+  DROP TABLE Студент
+  GO
+  DROP TABLE Оценка
+  GO
+  
+  -- Создание таблиц
+  CREATE TABLE Преподаватель
+  (
+  pnum  int PRIMARY KEY IDENTITY, 
+  pname varchar(40) NOT NULL,
+  pcaf  varchar(100)
+  )
+
+  GO
+
+  CREATE TABLE Студент
+  (
+    snum  int PRIMARY KEY IDENTITY,
+    sname varchar(40) NOT NULL,
+    sgrp  varchar(10),
+    spdp  int 
+  )
+
+  GO
+
+  CREATE TABLE Оценка
+  (
+    onum  int PRIMARY KEY IDENTITY,
+    opnum int NOT NULL
+    osnum int NOT NULL
+    odate datetime NOT NULL,
+    ocen  int CHECK(ocen >= 1 AND ocen <= 10)
+  )
+
+  GO
+
+  ALTER TABLE Студент ADD CONSTRAINT FK_Студ_Преп FOREIGN KEY (spdp) REFERENCES Преподаватель
+  GO
+  ALTER TABLE Оценка CONSTRAINT FK_Оценка_Преподаватель FOREIGN KEY (opnum) REFERENCES Преподаватель,
+                     CONSTRAINT FK_Оценка_Студент FOREIGN KEY (osnum) REFERENCES Студент
+```
+
+#### Создание и использользование представлений
+
+Представление (VIEW) это запрос выборки данных, сохранённый в базе данных под некоторым именем
+имена представлений можно использовать в других запросах на ряду с именами таблиц
+
+```SQL
+CREATE VIEW Имя_Представления [(список полей)] AS
+SELECT-Запрос
+```
+
+Пример:
+```SQL
+CREATE VIEW Кафедра1 AS
+SELECT pnum, pname, pcaf
+FROM ПРЕПОДАВАТЕЛЬ where pсфа = 'П-1'
+```
+
+Уничтожение представления:
+```SQL
+DROP VIEW имя_представления
+```
+
+Для чего были созданы представления:
+1. Упростить написание запросов
+2. Разграничение прав доступа
+
+Если имя представления можно использовать в операторах модификации данных (INSERT, UPDATE, DELETE)
+такое представление называется обновялемым, иначе только читаемым.
+
+Представление обновляемо если:
+1. Оно основано на одной таблице
+2. Содержит первичный ключ  таблице
+3. Не содержит полей с атрибутом Not NULL если для них не указано значение по умолчанию
+4. Не содержит операции DISTINCT
+5. Не содержит группировки
+
+Для MS SQL представление может содержать перемножение таблиц, но в операторах обновления должны использоваться поля только одной таблицы.
