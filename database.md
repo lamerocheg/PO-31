@@ -738,16 +738,428 @@ INSERT INTO Таблица (Список полей) SELECT-ПОДЗАПРОС
 #### UPDATE
 Изменение записей.
 
-UPDATE Таблица SET поле1 = значение1 {, поле2 = значение2} {WHERE условие}
+```SQL
+UPDATE Таблица SET поле1 = значение1 [, поле2 = значение2] [WHERE условие]
+```
 
 Оценки преподавателя П-3 увеличить на один балл
 
 ```SQL
-  UPDATE ОЦЕНКА SET ocen = ocen + 1 WHERE opnum = (SELECT pnum FROM ПРЕПОДАВАТЕЛЬ WHERE pname = 'П-3') AND ocen < 10
+UPDATE ОЦЕНКА SET ocen = ocen + 1 WHERE opnum = (SELECT pnum FROM ПРЕПОДАВАТЕЛЬ WHERE pname = 'П-3') AND ocen < 10
 ```
 
 Всех дипломников преподавателя П-1 передать преподавателю с кодом 3.
 
 ```SQL
-  UPDATE СТУДЕНТ SET spdp = 3 WHERE spdp = (SELECT pnum FROM ПРЕПОДАВАТЕЛЬ WHERE pname = 'П-1')
+UPDATE СТУДЕНТ SET spdp = 3 WHERE spdp = (SELECT pnum FROM ПРЕПОДАВАТЕЛЬ WHERE pname = 'П-1')
 ```
+
+#### DELETE
+Удаление строки таблицы.
+
+```SQL
+DELETE FROM Таблица 
+[WHERE Условие]
+```
+
+Пример:
+удалить оценки студента С-3
+
+```SQL
+DELETE FROM Оценка
+WHERE snum = (SELECT snum from Студент WHERE sname = 'C-3')
+```
+
+#### TRUNCATE
+Оператор очистки таблицы. (Не поддерживается в Access)
+
+```SQL
+TRANCATE TABLE Таблица
+```
+
+# Microsoft SQL Server
+
+Имя сервера: VAK-DB\SQLExpress
+Имя базы: StudTraining
+
+#### Из Access в MS SQL Server
+`
+Вкладка Таблицы -> Export -> (Тип данных: ODBC-источник) -> mdb -> 
+Создать -> Выбрать сервер -> VAK-DB\SQLExpress -> StudTraining
+`
+
+## Расширения языка SQL в MS SQL Server
+
+#### Расширения в операторе Select
+
+```SQL
+SELECT TOP число[PRCNT] [WITH TIES]
+```
+
+Пример:
+получить средние баллы студентов
+
+```SQL
+SELECT TOP 1 osnum, AVG(ocen) as AVGO
+FROM Оценка
+GROUP BY osnum
+ORDER BY AVG(ocen), osnum DESC
+```
+
+`WITH TIES`
+в результат входят дополниельные записи,
+которые в соответствии с условиями сортировки совпадают с последней отобранной записью.
+
+
+#### Создание таблиц с помощью SELECT
+```SQL
+SELECT поля INTO таблица [FROM] ...
+```
+
+Результат запроса помещаются в таблицу.
+
+```SQL
+SELECT osnum, AVG(ocen) as avgo INTO СредБал
+FROM Оценка
+GROUP By osnum
+```
+
+#### Использование подзапросов в списке полей
+Подзапрос обычно является связанным и должен возвращать не больше одного значения.
+
+Получить фамилии студентов и их сдрений балл.
+```SQL
+SELECT sname, (SELECT AVG(ocen) FROM оценка WHERE osnum = snum) as avgo
+FROM Студент
+```
+
+#### Использование подзапросов как источников данных в предложении FROM
+
+Фамилии и средние баллы студентов
+
+```SQL
+SELECT sname, avgo 
+FROM Сдудент, (SELECT osnum, AVG(ocen) as avgo FROM Оценка GROUP BY osnum)
+WHERE snum = osnumr
+```
+
+#### Дополнительные вилы JOIN
+
+* INNER / LEFT / RIGHT
+* FULL
+* CROSS
+* NATURAL
+
+
+#### Расширения в операторе UPDATE
+
+```SQL
+UPDATE SET [поля]
+[FROM таблица]
+[WHERE условие]
+```
+
+Нужно получить таблицу следующей структуры:
+
+| СведенияОСтудентах |
+----------------------
+|      snum          |
+|      sname         |
+|      sgrp          |
+|      spdp          |
+|      avgo          |
+|      pname         |
+|      pcaf          |
+
+
+Пишем следующие запросы:
+
+```SQL
+INSERT INTO СВОС(snum, sname, sgrp, spdp)
+SELECT * FROM Студент
+```
+
+```SQL
+UPDATE СВОС avgo = (SELECT AVG(ocen) FROM Оценка WHERE osnum = snum)
+```
+
+```SQL
+UPDATE СВОС SET
+pname = (SELEC pname FROM ПРЕП WHERE pnum = spdp)
+pcaf = (SELEC pname FROM ПРЕП WHERE pnum = spdp)
+```
+
+Или так (С помощью UPDATE FROM в MS SQL):
+
+```SQL
+UPDATE СВОС SET pname = П.pname, pcaf = П.pcaf
+FROM ПРЕП AS П WHERE spdp = pnum
+```
+
+Или так, чтобы информация с NULL коректно обновлялась (UPDATE FROM в MS SQL)
+
+```SQL
+UPDATE СВОС SET pname = П.pname, pcaf = П.pcaf
+FROM СВОС LFET JOIN ПРЕП ON spdp = pnum AS П
+```
+
+#### Расширения в операторе DELETE
+```SQL
+DELETE [FROM] Таблица
+[FROM список_таблиц]
+[WHERE условие]
+```
+
+Пример(NON MS-SQL):
+```SQL
+DELETE FROM Оценка WHERE osnum = (SELECT snum FROM Студент WHERE sname='C-3')
+```
+
+(MS-SQL)
+```SQL
+DELETE FROM Оценка
+FROM Студент
+WHERE osnum = snum AND sname = 'C-3'
+```
+
+# Создание таблиц в MS-SQL сервер
+
+#### Оператор создания таблиц
+```SQL
+CREATE TABLE имя_таблицы
+(определение поля | определения вычисляемого поля | ограничения на таблицу) [, ...]
+[ON группа_файлов]
+[TEXTIMAGE_ON группа_файлов]
+```
+
+##### Определение поля
+`
+                              Значение по умолчанию для поля   Поле счётчик(от начала с шагом i)       Поле с уникальным значением
+                                                  \/                     \/                              \/
+имя тип[(длина)] [collate алф. сортировки] [DEFAULT выражение] [ [IDENTITY [(начало, инкремент)]] | [ROWGUIDCOL] ] [ограничения на столбец [,...]]
+`
+
+###### Ограничения на столбец
+```SQL
+NULL        | NOT NULL  
+PRIMARY KEY | UNIQUE  
+
+[FOREIGN KEY] REFERENCES родительская_таблица [(поле)]        \
+[ON DELETE { NO ACTION | CASCADE | SET NULL | SET DEFAULT }]   > -- определение внешнего ключа
+[ON UPDATE { NO ACTION | CASCADE | SET NULL | SET DEFAULT }]  /
+```
+
+`ON DELETE` определяет действие в данной таблице при удалении записи в данной таблице.
+* `NO ACTION` - запретить удаление
+* `CASCADE` - удалить данную запись вслед за записью
+* `SET NULL` - занести NULL в данную таблицу на место удалённой в другой таблице
+* `SET DEFAULT` - занести значение по умолчанию
+
+`CHECK(условие)` - условие, проверяющее значение поля.  // `CHECK(поле <= 10)` 
+
+###### Пример
+
+```SQL
+CREATE TABLE Преподаватель
+(
+  pnum  int PRIMARY KEY IDENTITY, 
+  pname varchar(40) NOT NULL,
+  pcaf  varchar(100)
+)
+
+GO
+
+CREATE TABLE Студент
+(
+  snum  int PRIMARY KEY IDENTITY,
+  sname varchar(40) NOT NULL,
+  sgrp  varchar(10),
+  spdp  int REFERENCES Преподаватель (pnum)
+           ON DELETE SET NULL
+)
+
+GO
+
+CREATE TABLE Оценка
+(
+  onum  int PRIMARY KEY IDENTITY,
+  opnum int NOT NULL REFERENCES Преподаватель (pnum)
+  osnum int NOT NULL REFERENCES Студент (snum)
+                     ON DELETE CASCADE
+  odate datetime NOT NULL,
+  ocen  int CHECK(ocen >= 1 AND ocen <= 10)
+)
+
+GO
+```
+
+##### Оператор уничтожения таблиц
+```SQL
+DROP TABLE имя_таблицы
+```
+
+Для нормального функционирования скрипта создания базы нужно дописать в начале DROP TABLE
+(Нельзя удалять родительские таблицы, поэтому удалять нужно в обратном порядке)
+
+```SQL
+DROP TABLE Оценка
+GO
+DROP TABLE Студент
+GO
+DROP TABLE Преподаватель
+GO
+```
+
+##### Описание вычисляемого столбца
+```SQL
+описание_вычисляемого_столбца AS выражение
+```
+
+Пример:
+```SQL
+CREATE TABLE Tovar
+( ...
+  price money,
+  _count int,
+  cost AS price * _count
+)
+```
+
+###### Ограничение на таблицу
+
+```SQL
+[constraint имя_ограничения] 
+  PRIMARY KEY (столбец [, столбец])
+  UNIQUE (столбец [, стобец])
+  FOREIGN KEY (столбец [, стобец]) REFERENCES родительская_таблица [ON DELETE...] [ON UPDATE...]
+  CHECK (условие)
+```
+
+#### Модификация структуры таблицы
+
+```SQL
+ALTER TABLE имя_таблицы
+  ALTER COLUMN имя_стобца параметры
+  ADD COLUMN столбец [, ...]
+  ADD ограничение_на_таблицу
+  DROP COLUMN столбец [, ...]
+  DROP ограничение_на_таблицу
+```
+
+(Название связи -- FK_Дочерняя_Родительская)
+
+Удаление таблиц с удалением связей:
+```SQL
+  ALTER TABLE Студент DROP FK_Студ_Преп
+  GO
+  ALTER TABLE Оценка  DROP FK_Оценка_Преп, 
+                           FK_Оценка_Студ
+  
+  GO
+  
+  DROP TABLE Преподаватель
+  GO
+  DROP TABLE Студент
+  GO
+  DROP TABLE Оценка
+  GO
+  
+  -- Создание таблиц
+  CREATE TABLE Преподаватель
+  (
+  pnum  int PRIMARY KEY IDENTITY, 
+  pname varchar(40) NOT NULL,
+  pcaf  varchar(100)
+  )
+
+  GO
+
+  CREATE TABLE Студент
+  (
+    snum  int PRIMARY KEY IDENTITY,
+    sname varchar(40) NOT NULL,
+    sgrp  varchar(10),
+    spdp  int 
+  )
+
+  GO
+
+  CREATE TABLE Оценка
+  (
+    onum  int PRIMARY KEY IDENTITY,
+    opnum int NOT NULL
+    osnum int NOT NULL
+    odate datetime NOT NULL,
+    ocen  int CHECK(ocen >= 1 AND ocen <= 10)
+  )
+
+  GO
+
+  ALTER TABLE Студент ADD CONSTRAINT FK_Студ_Преп FOREIGN KEY (spdp) REFERENCES Преподаватель
+  GO
+  ALTER TABLE Оценка CONSTRAINT FK_Оценка_Преподаватель FOREIGN KEY (opnum) REFERENCES Преподаватель,
+                     CONSTRAINT FK_Оценка_Студент FOREIGN KEY (osnum) REFERENCES Студент
+```
+
+#### Создание и использользование представлений
+
+Представление (VIEW) это запрос выборки данных, сохранённый в базе данных под некоторым именем
+имена представлений можно использовать в других запросах на ряду с именами таблиц
+
+```SQL
+CREATE VIEW Имя_Представления [(список полей)] AS
+SELECT-Запрос
+```
+
+Пример:
+```SQL
+CREATE VIEW Кафедра1 AS
+SELECT pnum, pname, pcaf
+FROM ПРЕПОДАВАТЕЛЬ where pсфа = 'П-1'
+```
+
+Уничтожение представления:
+```SQL
+DROP VIEW имя_представления
+```
+
+Для чего были созданы представления:
+1. Упростить написание запросов
+2. Разграничение прав доступа
+
+Если имя представления можно использовать в операторах модификации данных (INSERT, UPDATE, DELETE)
+такое представление называется обновялемым, иначе только читаемым.
+
+Представление обновляемо если:
+1. Оно основано на одной таблице
+2. Содержит первичный ключ  таблице
+3. Не содержит полей с атрибутом Not NULL если для них не указано значение по умолчанию
+4. Не содержит операции DISTINCT
+5. Не содержит группировки
+
+Для MS SQL представление может содержать перемножение таблиц, но в операторах обновления должны использоваться поля только одной таблицы.
+
+Можно ограничить действие операторов insert и update так, чтобы можно было добавить или изменить записи только при условии, что они будут
+видны через представление:
+
+```SQL
+CREATE VIEW имя AS
+SELECT ...
+WITH CHECK OPTION
+```
+
+[comment]: # (LABS END)
+
+# Назначение индексов
+Индексы -- объекты, связанные с одной из таблиц БД и указывающие последовательность записей при 
+использовании сортировки по одному или нескольким полям таблицы.
+
+Индексы используются сервером в операторе выборки данных и автоматически модифицируются при изменении данных.
+
+Индексы позволяют ускорить:
+* поиск данных
+* выборку данных в отсортированной последовательности
+* соединение таблиц
+* группировку
+
+Индексы автоматически создаются для первичных ключей и поля UNIQUE.
