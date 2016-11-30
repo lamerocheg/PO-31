@@ -1163,3 +1163,77 @@ WITH CHECK OPTION
 * группировку
 
 Индексы автоматически создаются для первичных ключей и поля UNIQUE.
+
+
+# разрыв конспекта 
+
+
+
+
+## оператор языка Transact-SQL 
+ 
+комментарии : /*  */  или --
+
+описание переменых : оператор Delare , имена всех переменных начинается с `@`
+```SQL
+   Declare @имя тип[=значение]
+   
+   declare @n int=(select count(*) from студент)
+           @name varchar(40) , @p int
+```
+оператор присваивания : set или select
+```
+   set @name = 'Иванов'
+```
+```
+  select 'привет' as message
+```
+
+```
+  select @p = ocen from Оценка  
+```
+
+```
+ set @studs=''
+ select @studs=@studs + sname + ' ' from студент
+```
+
+
+кроме присваивания есть еще 
+ += , -= , &= , |= , ^= , *= , /= 
+ 
+ условный оператор `if условие [begin] оператор [end] [else оператор]`
+ 
+ оператор цикла : `while условие [begin] оператор [end] `
+ есть `continue` и  `break`
+ 
+ ```
+ /*
+ если срeдний балл преподавателя с кодом 1 больше 7, то полчить все его отличные оценки , иначе неудовлетворительные
+ */
+ if (select avg(ocen)  from оценка where opnum=1) (select * from ocen wher opnum=1 and ocen>=9) 
+ else  (select * from ocen wher opnum=1 and ocen<4)
+
+ ```
+ ```
+ /*
+ добавлять студенту с кодом 3 оценку 10, пока его средний бал не станет больше 8
+ */
+ while (select avg(ocen) from студент where osnum=3) <=8 
+   insert into оценка(opnum , osnum , odat  , ocen) values (1 , 3 , '2017-1-1' , 10)
+ 
+ или 
+ declare @s float=(select sum(ocen) from оценка where osnum = 3) 
+ declare  @c float=(select count(ocen) from student where osnum = 3 )
+ while @c=0.0 or @s/@c<=8.0
+   begin 
+    insert into оценка(opnum , osnum , odat  , ocen) values (1 , 3 , '2017-1-1' , 10)
+    set @s += 10
+    set @c += 1
+   end
+ ```
+ 
+ оператор GOTO метка
+ : метка
+ 
+ оператор return [целое] заверщает работу хранимой процедуры. может возвращать значение в вызывающую процедуру 
