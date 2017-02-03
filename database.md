@@ -1170,18 +1170,17 @@ WITH CHECK OPTION
 
 
 
-## оператор языка Transact-SQL 
+## Оператор языка Transact-SQL 
  
 комментарии : /*  */  или --
 
 описание переменых : оператор Delare , имена всех переменных начинается с '@'
 
 ```SQL
-   Declare @имя тип[=значение]
-   
+Declare @имя тип[=значение]
    declare @n int=(select count(*) from студент)
            @name varchar(40) , @p int
-```
+````
 
 оператор присваивания : set или select
 
@@ -1400,5 +1399,11 @@ GO
 DECLARE имя_курсора [INSENSETIVE] [SCROLL] CURSOR 
   FOR SELECT-Запрос
   [FOR {READ ONLY | UPDATE [of столбец, ...] }]
-
 ```
+
+`FOR UPDATE` Указывает, что курсор обновляем и его имя можно использовать в операторах UPDATE и DELETE
+
+```SQL
+UPDATE ... WHERE CURRENT OF имя_курсора
+```
+
