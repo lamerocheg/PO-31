@@ -1407,3 +1407,69 @@ DECLARE имя_курсора [INSENSETIVE] [SCROLL] CURSOR
 UPDATE ... WHERE CURRENT OF имя_курсора
 ```
 
+После описания курсора он должен быть открыт.
+
+```SQL
+DECLARE ...
+OPEN имя_курсора
+[цикл по записям курсора]
+CLOSE имя_курсора
+DEALLOCATE имя_курсора
+```
+
+Для чтения очередной записи курсора используем оператор FETCH
+
+```SQL
+FETCH [NEXT | PRIOR | FIRST | LAST | ABSOLUTE (номер) | RELATIVE (смещение)] -- если используется что-то кроме NEXT в описании курсора нужно использовать SCROLL
+имя_курсора INTO список_переменных
+
+-- В переменные помещаются значения полей очередной записи
+
+@@CURSOR ROWS -- количество записей в последнем открытом курсоре (лучше не использовать)
+@@FETCH_STATUS -- может принимать значение 0 (прочитана очередная запись), -1 (конец записи курсора), -2 (ошибка позиционирования)
+```
+
+Пример:
+"Отчисление"
+1. Создаётся временная таблица "хвостов" для хранения кода студента, кода преподавателя и даты получения.
+2. С помощью курсора реализуем просмотр оценок, упорядоченно по дате получения. 
+3. Неуды и неявки заносим во временную таблицу.
+4. Для удовлетворительной оценки удаляем одну неудовлетворительную того же студента у того же преподавателя (из временной таблицы)
+5. По концу просмотра возвращаем список студентов с хвостами и удаляем их из БД
+
+
+```SQL
+CREATE PROCEDURE Отчисление @grp VARCHAR(10)
+AS
+CREATE TABLE #RES (oid INT, sid INT, pid INT, odate DATETIME)
+
+CREATE ocens CURSOR FOR
+  SELECT onum, osnum, opnum, odate, ocen FROM Оценка
+  WHERE osnum IN (SELECT snum FROM Студент WHERE sgrp = @grp)
+  ORDER BY odate
+
+OPEN ocens
+DECLARE @ocen INT, @onum INT, @osnum INT, @opnum INT, @odate DATETIME
+FETCH ocens INTO @onum, @osnum, @opnum, @odate, @ocen
+
+WHILE @@FETCH_STATUS = 0
+BEGIN
+  IF @ocen < 4 OR @ocen IS NULL
+    INSERT INTO #RES VALUES (@onum, @osnum, @opnum, @odate)
+  ELSE
+  BEGIN
+    DECLARE @oid INT = (SELECT TOP 1 oid FROM #RES WHERE sid = @snum AND pid = @opnum ORDER BY odate)
+    DELETE FROM #RES WHRE oid = @oid 
+  END
+  FETCH ocens INTO @onum, @osnum, @opnum, @odate, @ocen
+END
+
+CLOSE ocens
+DEALLOCATE ocens
+
+SELECT sgrp, sname FROM Студент WHERE snum IN (SELECT sid FROM #RES) ORDER BY 1, 2
+
+DELETE FROM Оценка WHERE osnum IN (SELECT sid FROM #RES)
+DELETE FROM Студент WHERE snum IN (SELECT sid FROM #RES)
+```
+
