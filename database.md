@@ -1174,26 +1174,30 @@ WITH CHECK OPTION
  
 комментарии : /*  */  или --
 
-описание переменых : оператор Delare , имена всех переменных начинается с `@`
+описание переменых : оператор Delare , имена всех переменных начинается с '@'
+
 ```SQL
    Declare @имя тип[=значение]
    
    declare @n int=(select count(*) from студент)
            @name varchar(40) , @p int
 ```
+
 оператор присваивания : set или select
+
+```SQL
+ set @name = 'Иванов'
 ```
-   set @name = 'Иванов'
-```
-```
+
+```SQL
   select 'привет' as message
 ```
 
-```
+```SQL
   select @p = ocen from Оценка  
 ```
 
-```
+```SQL
  set @studs=''
  select @studs=@studs + sname + ' ' from студент
 ```
@@ -1215,6 +1219,7 @@ WITH CHECK OPTION
  else  (select * from ocen wher opnum=1 and ocen<4)
 
  ```
+ 
  ```
  /*
  добавлять студенту с кодом 3 оценку 10, пока его средний бал не станет больше 8
@@ -1237,3 +1242,163 @@ WITH CHECK OPTION
  : метка
  
  оператор return [целое] заверщает работу хранимой процедуры. может возвращать значение в вызывающую процедуру 
+ 
+ # Процедуры
+ 
+ ```SQL
+ CREATE PROC[EDURE] имя [параметры] @имя тип [output] [=зн.по умолчанию]
+ {ENCRYPTION | RECOMPILE | ENCRYPRION, RECOMPILE}
+ AS
+ тело_процедуры
+ GO
+ ```
+ 
+ Результатом работы процедуры является результат любого оператора SELECT не связанного с созданием таблицы или присваивания значений переменным
+ 
+ 
+ #### Модификация процедуры
+ ALTER PROC[EDURE]
+ {}
+ 
+ #### Оператор вызова процедуры
+ [EXEC[UTE]] [@переменная_для_RETURN-значения=] имя_процедуры [значения параметров]
+ 
+ Параметры-значения могут задаваться в позиционном, ключевом и смешанном форматах
+ 
+ * Позиционный -- перечисляем значения в том же порядке как определены параметры
+ * Ключевой -- пишем @имя_параметра = значение (в любом порядке)
+ * Смешанный -- часть позиционно, остальные в ключевом
+ 
+ Пример:
+ ```SQL
+ CREATE PROCEDURE TEST @a int = 2, @b int = -7, @c varchar(20) = 'Привет', @d int = 100
+ AS
+ ...
+ GO
+ 
+ EXEC TEST 18, 2                 -- Позиционный
+ EXEC TEST @c = 'Пока', @a = 23  -- Ключевой
+ EXEC TEXT 28, @d = -5, @b = 115 -- Смешанный
+ ```
+ Для получения значения выходного параметра в операторе exec указывается OUTPUT для него
+ 
+ ```SQL
+ CREATE PROC MyProc @p int output
+ AS
+ SET @p = (SELECT COUNT(*) FROM Преподаватели)
+ GO
+ 
+ DECLARE @n INT
+ EXEC MyProc @n OUTPUT
+ 
+ -- Или так
+ 
+ CREATE PROC MyProc
+ AS
+ DECLARE @p = (SELECT COUNT(*) FROM Преподаватели)
+ RETURN @p
+ GO
+ 
+ EXEC @n = MyProc
+ 
+ SQL
+ CREATE PROCEDURE Успеваемость @snum int, @all bit = 1
+ AS
+ IF @all = 1
+   SELECT opnum, odate, ocen FROM Оценка WHERE osnum = @snum
+ ELSE 
+   SELECT AVG(ocen) AS Средняя FROM Оценка WHERE osnum = @snum
+ GO
+ 
+ EXECUTE Успеваемость 3 -- Оценки третьего студента
+ EXECUTE Успеваемость @snum = 3, @all = 0 -- Средняя оценка студента
+ 
+ Набор данных, возвращаемых процедурой можно использоват в INSERT
+ В MsAccess для выполнения такого нужно указать тип запроса "запрос к серверу"
+ В свойстве запроса надо указать ODBC источник
+ 
+# Второй семестр
+
+### Табличные переменные
+Описание:
+```SQL
+DECLARE @имя TABLE (структура таблицы)
+```
+
+Пример: Процедура возвращает средние баллы студентов с указанием фамилии и наименования группы.
+
+```SQL
+CREATE PROC СредБалл
+AS
+DECLARE @RES TABLE (id INT, avgocen FLOAT, name VARCHAR(40), grp VARCHAR(10))
+INSERT INTO @RES (id, avgocen)
+  SELECT osnum, AVG(CAST(ocen AS FLOAT)) FROM ОЦЕНКА
+  GROUP BY osnum
+-- Это мы закомментировали с отвращением
+-- UPDATE @RES SET name = (SELECT sname FROM СТУДЕНТ WHERE snum = id), grp = (SELECT sgrp FROM СТУДЕНТ WHERE snum = id)
+UPDATE @RES set name = sname, grp = sgrp
+  FROM СТУДЕНТ
+  WHERE snum = id
+SELECT grp, name, avgocen FROM @RES
+  ORDER BY 1,2
+```
+
+### Табличные типы и табличные параметры
+
+```SQL
+-- Создать тип
+CREATE TYPE имя_типа AS TABLE (структура таблицы)
+
+-- Удалить тип
+DROP TYPE имя_типа
+
+-- Объявление переменной типа
+DECLARE @имя имя_типа
+
+-- Создание процедуры. принимающий параметр типа
+CREATE PROCEDURE @parameter TYPE, @имя имя_типа READONLY, ...
+```
+
+Пример: Процедура удаления студентов в качестве параметра принимающая табличную переменную с кодами студентов.
+
+```SQL
+CREATE TYPE СтудКод AS TABLE (snum INT)
+GO
+
+CREATE PROCEDURE УдалСтуд @snums СтудКод READONLY
+AS
+DELETE FROM ОЦЕНКА 
+  WHERE osnum IN (SELECT snum FROM @snums)
+DELETE FROM СТУДЕНТ
+  WHERE snum IN (SELECT snum FROM @snums)
+GO
+
+CREATE PROCEDURE Отчисление
+AS
+DECLARE @sid СтудКод
+INSERT INTO @sid
+  SELECT osnum FROM ОЦЕНКА WHERE ocen < 4 OR ocen IS NULL
+EXEC УдалСтуд @sid
+GO
+
+CREATE PROCEDURE КонецОбучения
+AS
+DECLARE @sid СтудКод
+INSERT INTO @sid
+  SELECT osnum FROM Студент WHERE spdp IS NOT NULL
+EXEC УдалСтуд @sid
+GO
+```
+
+### Курсоры
+
+Курсор это объект в базе данных, представляющий собой временный набор данных, полученный SELECT запросом и связанный с ним
+указатель текущей записи.
+
+Описание курсора:
+```SQL
+DECLARE имя_курсора [INSENSETIVE] [SCROLL] CURSOR 
+  FOR SELECT-Запрос
+  [FOR {READ ONLY | UPDATE [of столбец, ...] }]
+
+```
