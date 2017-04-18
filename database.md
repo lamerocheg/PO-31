@@ -1630,3 +1630,138 @@ GO
 -- Теперь возможно такое
 EXEC Удаление 'Оценка', @where = 'osnum = 3'
 ```
+
+# Триггеры
+
+SOME SXT HAPPENED HERE
+======================
+
+```SQL
+CREATE TABLE ОценкаLog
+(idLog in IDENTITY PRIMARY KEY,
+typLog char, -- 'D'/'I'
+dateLog datetime,
+userLog varchar(40),
+hostLog varchar(40),
+onum int,
+opnum int,
+osnum int,
+odate datetime,
+ocen int
+)
+GO
+
+CREATE TRIGGER LogOcen ON Оценка
+FOR INSERT, UPDATE, DELETE
+AS
+DECLATE @dt DATETIME = getdate()
+INSERT INTO ОценкаLog
+  SELECT 'D', @dt, SYSTEM_USER(), HOST_NAME(),
+    DELETED.*
+    FROM DELETED
+INSERT INTO ОценкаLog
+  SELECT 'I', @dt, SYSTEM_USER(), HOST_NAME(),
+    INSERTED.*
+    FROM INSERTED
+GO
+```
+
+### Использование триггеров для накопления суммарных (итоговых) данных
+
+Средние баллы студентов сохраняются в стаблице "Студент"
+
+```SQL
+ALTER TABLE Студент
+  ADD ocenCount INT DEFAULT 0,
+      ocenSum INT DEFAULT 0
+      ocenAvg AS CASE WHEN ocenCount = 0 THEN 0.0
+                      ELSE CAST(ocenSum AS FLOAT) / ocenCount
+                 END
+GO
+
+UPDATE Студент SET ocenCount = (SELECT COUNT(ocen) FROM Оценка WHERE osnum = snum),
+                   ocenSum   = (SELECT SUM(ocen) FROM Оценка WHERE osnum = snum)
+GO
+
+CREATE TRIGGER IUDОценка ON Оценка FOR INSERT, UPDATE, DELETE
+AS
+UPDATE Студент SET ocenCount = ocenCount + C,
+                   ocenSum   = ocenSum + S
+  FROM (SELECT osnum, COUNT(ocen) AS C, SUM(ocen) AS S
+          FROM Inserted
+          GROUP BY osnum) AS T
+  WHERE snum = osnum
+
+UPDATE Студент SET ocenCount = ocenCount - C,
+                   ocenSum   = ocenSum - S
+  FROM (SELECT osnum, COUNT(ocen) AS C, SUM(ocen) AS S
+          FROM Deleted
+          GROUP BY osnum) AS T
+  WHERE snum = osnum
+GO
+```
+
+### Использование триггеров для денормализации таблиц
+
+```SQL
+CREATE TABLE group
+(id INT IDENTITY PRIMARY KEY
+ gname VARCHAR(10))
+GO
+
+CREATE TABLE student
+(id INT IDENTITY PRIMARY KEY,
+ sname VARCHAR(40),
+ idg INT REFRENCES group NOT NULL)
+GO
+
+CREATE VIEW studgrp
+AS
+  SELECT S.id, sname, idg, gname
+  FROM student AS S, group AS g
+  WHERE g.id = idg
+GO
+```
+
+Предположим, время выполнения представления стало недопустимо большим.
+Проблему решаем путём добавления наименования группы в таблицу "студент".
+
+Выходим ночью (чтобы никто не видел)
+
+```SQL
+ALTER TABLE student
+  ADD gname VARCHAR(10)
+GO
+
+UPDATE student SET gname = (SELECT gname FROM group WHERE id = idg)
+GO
+
+ALTER VIEW studgrp
+AS
+  SELECT id, sname, idg, gname
+  FROM student
+GO
+
+CREATE TRIGGET IStudent ON student FROM INSTEAD OF INSERT
+AS
+INSERT INTO student (sname, idg, gname)
+  SELECT sname, idg, G.gname
+  FROM inserted, group AS G
+  WHERE idg = G.id
+GO
+
+CREATE TRIGGET UStudent ON student FROM INSTEAD OF UPDATE
+AS
+UPDATE student SET sname = I.sname, idg = I.idg, gname = G.gname
+               FROM student AS S, inserted AS I
+               WHERE S.id = I.id AND I.idg = G.id
+GO
+
+CREATE UGroup ON group FROM update
+AS
+IF UPDATE(gname)
+  UPDATE student SET gname = g.gname
+  FROM inserted AS G
+  WHERE idg = g.id
+GO
+```
