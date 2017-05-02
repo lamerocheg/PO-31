@@ -1742,7 +1742,7 @@ AS
   FROM student
 GO
 
-CREATE TRIGGET IStudent ON student FROM INSTEAD OF INSERT
+CREATE TRIGGER IStudent ON student FROM INSTEAD OF INSERT
 AS
 INSERT INTO student (sname, idg, gname)
   SELECT sname, idg, G.gname
@@ -1750,7 +1750,7 @@ INSERT INTO student (sname, idg, gname)
   WHERE idg = G.id
 GO
 
-CREATE TRIGGET UStudent ON student FROM INSTEAD OF UPDATE
+CREATE TRIGGER UStudent ON student FROM INSTEAD OF UPDATE
 AS
 UPDATE student SET sname = I.sname, idg = I.idg, gname = G.gname
                FROM student AS S, inserted AS I
@@ -1765,3 +1765,133 @@ IF UPDATE(gname)
   WHERE idg = g.id
 GO
 ```
+
+Контроль
+========
+* 1 is 5+7
+* 2 is 8
+* 3 is 9
+* 4 is 9
+* 5 is 18
+* 6 is 11
+* 7 is 17
+* 8 is 23
+
+## Создание обновляемых представлений
+
+```SQL
+CREATE TABLE grp
+(id INT IDENTITY PRIMARY KEY,
+ gname VARCHAR(20) NOT NULL
+)
+GO
+
+CREATE TABLE student 
+(ids INT IDENTITY PRIMARY KEY,
+sname VARCHAR(40),
+idg INT REFERENCES grp NOT NULL)
+GO
+
+CREATE VIEW studGrp
+AS
+SELECT ids + 0 AS ids, sname, idg + 0 AS idg, gname -- +0 для того, чтобы можно было делать INSERT
+FROM student, grp
+WHERE idg = id
+GO
+```
+
+Требуется сделать studGrp обновляемым
+при этом всегда обновляться будет таблица студент и группа для студента может быть определена
+как кодом, так и названием.
+Обработать неверное название или код
+
+
+```SQL
+CREATE TRIGGER INSERTStudGrp ON studGrp INSTEAD OF INSERT
+AS
+INSERT INTO student (sname, idg)
+  SELECT sname, idg 
+  FROM inserted
+  WHERE gname IS NULL
+  
+INSERT INFO student (sname, idg)
+  SELECT sname, id
+  FROM inserted AS I LEFT JOIN grp AS G ON I.gname = G.gname
+  WHERE idg IS NULL
+
+INSERT INFO student (sname, idg)
+  SELECT sname, id
+  FROM inserted AS I LEFT JOIN grp AS G ON I.gname = G.gname and I.idg = G.id
+  WHERE idg IS NOT NULL AND I,gname IS NOT NULL
+GO
+
+CREATE TRIGGER UPDATEStudGrp ON studGrp INSTEAD OF UPDATE
+AS
+IF UPDATE(gname)
+  IF NOT UPDATE(idg)
+    UPDATE student SET sname = I.sname, idg = G.id
+    FROM student AS S 
+         INNER JOIN inserted AS I  
+         ON S.ids = I.ids
+         LEFT JOIN grp AS G 
+         ON G.gname = I.gname
+  ELSE
+    UPDATE student SET sname = I.sname, idg = G.id
+    FROM student AS S 
+         INNER JOIN inserted AS I 
+         ON S.ids = I.ids
+         LEFT JOIN grp AS G 
+         ON G.gname = I.gname AND G.id = I.igd
+ELSE
+  UPDATE student SET idg = I.idg
+  FROM student AS S 
+       INNER JOIN inserted 
+       ON S.ids = I.ids
+GO
+
+CREATE TRIGGER DELETEStudGrp ON studGrp INSTEAD OF DELETE
+AS
+  DELETE FROM student
+  WHERE ids IN (SELECT ids FROM deleted)
+GO
+```
+
+## Стандарнтные функции MS SQL Server
+
+#### Математические
+* ABS
+* FLOOR
+* CEILING
+* ROUND (выражение, длина, {, вид операции}); ROUND(748.581, 0) = 749, 1 = 748.6, 2 = 748.58, -1 = 750, -2 = 700, -3 = 1000, -4 = 0
+* SIGN; = 0, 1, -1
+* SQRT
+* SQUARE
+* POWER
+* EXP
+* LOG
+* LOG10
+* SIN, COS, TAN, COT, ASIN, ACOS
+* DEGREES / RADIAN
+* PI
+* RAND(число)
+
+#### Строковые
+* ASCII - Код символа
+* CHAR - Символ по коду
+* UNICODE/NCHAR - Тоже самое только для юникода
+* LOWER / UPPER
+* LEN
+* LEFT('ABC', 2) = 'AB'
+* RIGHT
+* SUBSTRING
+* CHARINDEX (подстрока, строка)
+* REVERSE
+* REPLACE
+* ISUMERIC
+* SOUNDEX
+
+#### Функции даты-времени
+* DATENAME(часть даты)
+...
+и вообще здесь много разных функций, просто мне лень писать. 
+лучше загугли.
