@@ -1141,14 +1141,13 @@ DROP VIEW имя_представления
 
 Можно ограничить действие операторов insert и update так, чтобы можно было добавить или изменить записи только при условии, что они будут
 видны через представление:
-
 ```SQL
 CREATE VIEW имя AS
 SELECT ...
 WITH CHECK OPTION
 ```
 
-[comment]: # (LABS END)
+comment: # (LABS END)
 
 # Назначение индексов
 Индексы -- объекты, связанные с одной из таблиц БД и указывающие последовательность записей при 
@@ -1176,11 +1175,10 @@ WITH CHECK OPTION
 
 описание переменых : оператор Delare , имена всех переменных начинается с '@'
 
-```SQL
+SQL
 Declare @имя тип[=значение]
    declare @n int=(select count(*) from студент)
            @name varchar(40) , @p int
-````
 
 оператор присваивания : set или select
 
@@ -1201,32 +1199,34 @@ Declare @имя тип[=значение]
  select @studs=@studs + sname + ' ' from студент
 ```
 
-
 кроме присваивания есть еще 
- += , -= , &= , |= , ^= , *= , /= 
- 
- условный оператор `if условие [begin] оператор [end] [else оператор]`
- 
- оператор цикла : `while условие [begin] оператор [end] `
- есть `continue` и  `break`
- 
- ```
+* `+=` 
+* `-=`
+* `&=` 
+* `|=` 
+* `^=` 
+* `*=` 
+* `/=` 
+* условный оператор: `if условие [begin] оператор [end] [else оператор]`
+* оператор цикла : `while условие [begin] оператор [end]`
+* `continue` и  `break`
+
+```SQL
  /*
  если срeдний балл преподавателя с кодом 1 больше 7, то полчить все его отличные оценки , иначе неудовлетворительные
  */
  if (select avg(ocen)  from оценка where opnum=1) (select * from ocen wher opnum=1 and ocen>=9) 
  else  (select * from ocen wher opnum=1 and ocen<4)
-
- ```
- 
- ```
+```
+```SQL
  /*
  добавлять студенту с кодом 3 оценку 10, пока его средний бал не станет больше 8
  */
  while (select avg(ocen) from студент where osnum=3) <=8 
    insert into оценка(opnum , osnum , odat  , ocen) values (1 , 3 , '2017-1-1' , 10)
- 
- или 
+``` 
+ или
+```SQL
  declare @s float=(select sum(ocen) from оценка where osnum = 3) 
  declare  @c float=(select count(ocen) from student where osnum = 3 )
  while @c=0.0 or @s/@c<=8.0
@@ -1235,12 +1235,12 @@ Declare @имя тип[=значение]
     set @s += 10
     set @c += 1
    end
- ```
+```
  
  оператор GOTO метка
  : метка
  
- оператор return [целое] заверщает работу хранимой процедуры. может возвращать значение в вызывающую процедуру 
+ оператор `return [целое]` заверщает работу хранимой процедуры. может возвращать значение в вызывающую процедуру 
  
  # Процедуры
  
@@ -1311,6 +1311,7 @@ Declare @имя тип[=значение]
  
  EXECUTE Успеваемость 3 -- Оценки третьего студента
  EXECUTE Успеваемость @snum = 3, @all = 0 -- Средняя оценка студента
+ ```
  
  Набор данных, возвращаемых процедурой можно использоват в INSERT
  В MsAccess для выполнения такого нужно указать тип запроса "запрос к серверу"
@@ -1319,6 +1320,7 @@ Declare @имя тип[=значение]
 # Второй семестр
 
 ### Табличные переменные
+
 Описание:
 ```SQL
 DECLARE @имя TABLE (структура таблицы)
@@ -1473,3 +1475,423 @@ DELETE FROM Оценка WHERE osnum IN (SELECT sid FROM #RES)
 DELETE FROM Студент WHERE snum IN (SELECT sid FROM #RES)
 ```
 
+# Хранимые Функции (User Defined Functions)
+
+Функции бывают:
+* Скалярные (Scalar)
+* Inline Table 
+* Multistatement tables function
+
+### Скалярные функции
+```SQL
+CREATE FUNCTION имя([параметры])
+  RETURNS тип_возвращаемого_значения
+[AS]
+BEGIN
+-- Тело функции
+  ...
+  RETURN возвращаемое_значение
+END
+```
+
+Вызов скалярной функции возможен везде в запросах, где может присутствовать выражение.
+Перед именем функции должно быть указано имя схемы.
+
+Пример:
+```SQL
+-- Параметр: код руководителя диплома
+-- Результат: фамилия руководителя
+CREATE FUNCTION ДипРук(@pnum INT) RETURNS VARCHAR(40)
+BEGIN
+  DECLARE @RES VARCHAR(50)
+  SELECT @RES = pname FROM Преп WHERE pnum = @pnum
+  RETURN @RES
+END
+GO
+
+-- Использвание функции
+SELECT sname, dbo.ДипРук(spdp) AS pname
+FROM Студент
+```
+
+Пример:
+```SQL
+-- Параметр: Название группы и код преподавателя
+-- Результат: количество оценок, полученных студентами группы у преподавателей
+CREATE FUNCTION КолОцнГрПр(@gname varchar(10), @pnum INT) RETURNS INT
+BEGIN
+  RETURN (SELECT COUNT(*) FROM Оценка WHERE snum IN (SELECT snum FROM Студент WHERE sgrp LIKE @gname) AND opnum = @pnum)
+END
+GO
+
+-- Получить количество оценок преподавателя 1 в группе Г-1
+SELECT dbo.КолОцнГрПр('Г-1', 1)
+
+-- Для каждого преподавателя кафедры К-1 указать количество оценок, выставленных студентам специальности ПМ
+SELECT pname, dbo.КолОцпГрПр('ПМ%', pnum)
+FROM Преподаватель
+```
+
+### Inline-table functions
+```SQL
+CREATE FUNCTION имя([параметры]) RETURNS TABLE
+AS
+RETURN SELECT-Запрос
+```
+
+Функции могут использоваться в качестве источника данных в других запросах.
+Значения параметров -- константы и переменные.
+
+Пример:
+```SQL
+-- Список дипломников заданного преподавателя. (
+-- Параметр: Фамилия
+CREATE FUNCTION Дипломники(@pname VARCHAR(40)) RETURNS
+AS
+  RETURN
+    SELECT snum, sname, sgrp, spdp FROM Студент
+    WHERE spdp IN (SELECT pnum FROM Преподаватель WHERE pname LIKE @pname)
+    
+-- Получить фамилии и группы всех дипломников
+SELECT sname, sgrp
+FROM dbo.Дипломники('%')
+```
+
+# Многострочные табличные функции
+```SQL
+CREATE FUNCTION имя([параметры]) RETURNS @имя_таблицы TABLE (структура таблицы)
+[AS]
+BEGIN
+  RETURN
+END
+GO
+```
+
+Пример:
+```SQL
+CREATE FUNCTION ЛучшиеСтуденты(@minavgocen foat, @maxcountstud int)
+RETURNS @RES TABLE (sgrp VARCHAR(10), sname VARCHAR(40), avgocen FLOAT)
+BEGIN
+  DECLARE gr CURSOR FOR
+    SELECT DISTINCT sgrp FROM Студент ORDER BY sgrp
+  DECLARE @grp VARCAHR(10)
+  
+  OPEN gr
+  
+  FETCH gr INTO @prg
+  WHILE @@FETCH_STATUS = 0
+  BEGIN
+    SELECT TOP (@maxcontstud), @grp, sname, AVG(ocen)
+      FROM Студент, Оценка
+      WHERE osnum = snum AND sgrp = @grp
+      GROUP BY sname,snum
+      HAVING AVG(ocen) >= @minavgocen
+      ORDER BY AVG(ocen)
+    FETCH gr INTO @prg
+  END
+  
+  CLOSE gr
+  DEALLOCATE gr
+  RETURN
+END
+```
+
+# Программное формирование и выполнение операторов SQL
+
+Это может быть необходимо потому как параметры процедур не могуть быть использованы как имена таблиц или имена полей в SQL операторах.
+Т.е. так написать нельзя:
+```SQL
+CREATE PROC TableDate @tableName VARCHAR(255)
+AS
+  SELECT * FROM @tableName
+GO
+```
+
+Возможно программное формирование оператора с последующим выполнением следующим образом:
+```SQL
+CREATE PROC Table @tableName VARCHAR(255)
+AS
+  EXEC ('SELECT * FROM ' + @tableName)
+GO
+```
+
+Пример:
+```SQL
+-- Удаление записей из таблицы по условию.
+-- Если условие не задано, очистить таблицу с помощью TRUNCATE TABLE
+CREATE PROC Удаление @tableName VARCHAR(255), @where VARCHAR(1000)
+AS
+  IF @where = '' OR @where IS NULL
+    EXEC ('TRUNCATE TABLE ' + @tableName)
+  ELSE
+    EXEC ('DELETE FROM ' + @tableName + ' WHERE ' + @where)
+GO
+
+-- Теперь возможно такое
+EXEC Удаление 'Оценка', @where = 'osnum = 3'
+```
+
+# Триггеры
+
+SOME SXT HAPPENED HERE
+======================
+
+```SQL
+CREATE TABLE ОценкаLog
+(idLog in IDENTITY PRIMARY KEY,
+typLog char, -- 'D'/'I'
+dateLog datetime,
+userLog varchar(40),
+hostLog varchar(40),
+onum int,
+opnum int,
+osnum int,
+odate datetime,
+ocen int
+)
+GO
+
+CREATE TRIGGER LogOcen ON Оценка
+FOR INSERT, UPDATE, DELETE
+AS
+DECLATE @dt DATETIME = getdate()
+INSERT INTO ОценкаLog
+  SELECT 'D', @dt, SYSTEM_USER(), HOST_NAME(),
+    DELETED.*
+    FROM DELETED
+INSERT INTO ОценкаLog
+  SELECT 'I', @dt, SYSTEM_USER(), HOST_NAME(),
+    INSERTED.*
+    FROM INSERTED
+GO
+```
+
+### Использование триггеров для накопления суммарных (итоговых) данных
+
+Средние баллы студентов сохраняются в стаблице "Студент"
+
+```SQL
+ALTER TABLE Студент
+  ADD ocenCount INT DEFAULT 0,
+      ocenSum INT DEFAULT 0
+      ocenAvg AS CASE WHEN ocenCount = 0 THEN 0.0
+                      ELSE CAST(ocenSum AS FLOAT) / ocenCount
+                 END
+GO
+
+UPDATE Студент SET ocenCount = (SELECT COUNT(ocen) FROM Оценка WHERE osnum = snum),
+                   ocenSum   = (SELECT SUM(ocen) FROM Оценка WHERE osnum = snum)
+GO
+
+CREATE TRIGGER IUDОценка ON Оценка FOR INSERT, UPDATE, DELETE
+AS
+UPDATE Студент SET ocenCount = ocenCount + C,
+                   ocenSum   = ocenSum + S
+  FROM (SELECT osnum, COUNT(ocen) AS C, SUM(ocen) AS S
+          FROM Inserted
+          GROUP BY osnum) AS T
+  WHERE snum = osnum
+
+UPDATE Студент SET ocenCount = ocenCount - C,
+                   ocenSum   = ocenSum - S
+  FROM (SELECT osnum, COUNT(ocen) AS C, SUM(ocen) AS S
+          FROM Deleted
+          GROUP BY osnum) AS T
+  WHERE snum = osnum
+GO
+```
+
+### Использование триггеров для денормализации таблиц
+
+```SQL
+CREATE TABLE group
+(id INT IDENTITY PRIMARY KEY
+ gname VARCHAR(10))
+GO
+
+CREATE TABLE student
+(id INT IDENTITY PRIMARY KEY,
+ sname VARCHAR(40),
+ idg INT REFRENCES group NOT NULL)
+GO
+
+CREATE VIEW studgrp
+AS
+  SELECT S.id, sname, idg, gname
+  FROM student AS S, group AS g
+  WHERE g.id = idg
+GO
+```
+
+Предположим, время выполнения представления стало недопустимо большим.
+Проблему решаем путём добавления наименования группы в таблицу "студент".
+
+Выходим ночью (чтобы никто не видел)
+
+```SQL
+ALTER TABLE student
+  ADD gname VARCHAR(10)
+GO
+
+UPDATE student SET gname = (SELECT gname FROM group WHERE id = idg)
+GO
+
+ALTER VIEW studgrp
+AS
+  SELECT id, sname, idg, gname
+  FROM student
+GO
+
+CREATE TRIGGER IStudent ON student FROM INSTEAD OF INSERT
+AS
+INSERT INTO student (sname, idg, gname)
+  SELECT sname, idg, G.gname
+  FROM inserted, group AS G
+  WHERE idg = G.id
+GO
+
+CREATE TRIGGER UStudent ON student FROM INSTEAD OF UPDATE
+AS
+UPDATE student SET sname = I.sname, idg = I.idg, gname = G.gname
+               FROM student AS S, inserted AS I
+               WHERE S.id = I.id AND I.idg = G.id
+GO
+
+CREATE UGroup ON group FROM update
+AS
+IF UPDATE(gname)
+  UPDATE student SET gname = g.gname
+  FROM inserted AS G
+  WHERE idg = g.id
+GO
+```
+
+Контроль
+========
+* 1 is 5+7
+* 2 is 8
+* 3 is 9
+* 4 is 9
+* 5 is 18
+* 6 is 11
+* 7 is 17
+* 8 is 23
+
+## Создание обновляемых представлений
+
+```SQL
+CREATE TABLE grp
+(id INT IDENTITY PRIMARY KEY,
+ gname VARCHAR(20) NOT NULL
+)
+GO
+
+CREATE TABLE student 
+(ids INT IDENTITY PRIMARY KEY,
+sname VARCHAR(40),
+idg INT REFERENCES grp NOT NULL)
+GO
+
+CREATE VIEW studGrp
+AS
+SELECT ids + 0 AS ids, sname, idg + 0 AS idg, gname -- +0 для того, чтобы можно было делать INSERT
+FROM student, grp
+WHERE idg = id
+GO
+```
+
+Требуется сделать studGrp обновляемым
+при этом всегда обновляться будет таблица студент и группа для студента может быть определена
+как кодом, так и названием.
+Обработать неверное название или код
+
+
+```SQL
+CREATE TRIGGER INSERTStudGrp ON studGrp INSTEAD OF INSERT
+AS
+INSERT INTO student (sname, idg)
+  SELECT sname, idg 
+  FROM inserted
+  WHERE gname IS NULL
+  
+INSERT INFO student (sname, idg)
+  SELECT sname, id
+  FROM inserted AS I LEFT JOIN grp AS G ON I.gname = G.gname
+  WHERE idg IS NULL
+
+INSERT INFO student (sname, idg)
+  SELECT sname, id
+  FROM inserted AS I LEFT JOIN grp AS G ON I.gname = G.gname and I.idg = G.id
+  WHERE idg IS NOT NULL AND I,gname IS NOT NULL
+GO
+
+CREATE TRIGGER UPDATEStudGrp ON studGrp INSTEAD OF UPDATE
+AS
+IF UPDATE(gname)
+  IF NOT UPDATE(idg)
+    UPDATE student SET sname = I.sname, idg = G.id
+    FROM student AS S 
+         INNER JOIN inserted AS I  
+         ON S.ids = I.ids
+         LEFT JOIN grp AS G 
+         ON G.gname = I.gname
+  ELSE
+    UPDATE student SET sname = I.sname, idg = G.id
+    FROM student AS S 
+         INNER JOIN inserted AS I 
+         ON S.ids = I.ids
+         LEFT JOIN grp AS G 
+         ON G.gname = I.gname AND G.id = I.igd
+ELSE
+  UPDATE student SET idg = I.idg
+  FROM student AS S 
+       INNER JOIN inserted 
+       ON S.ids = I.ids
+GO
+
+CREATE TRIGGER DELETEStudGrp ON studGrp INSTEAD OF DELETE
+AS
+  DELETE FROM student
+  WHERE ids IN (SELECT ids FROM deleted)
+GO
+```
+
+## Стандарнтные функции MS SQL Server
+
+#### Математические
+* ABS
+* FLOOR
+* CEILING
+* ROUND (выражение, длина, {, вид операции}); ROUND(748.581, 0) = 749, 1 = 748.6, 2 = 748.58, -1 = 750, -2 = 700, -3 = 1000, -4 = 0
+* SIGN; = 0, 1, -1
+* SQRT
+* SQUARE
+* POWER
+* EXP
+* LOG
+* LOG10
+* SIN, COS, TAN, COT, ASIN, ACOS
+* DEGREES / RADIAN
+* PI
+* RAND(число)
+
+#### Строковые
+* ASCII - Код символа
+* CHAR - Символ по коду
+* UNICODE/NCHAR - Тоже самое только для юникода
+* LOWER / UPPER
+* LEN
+* LEFT('ABC', 2) = 'AB'
+* RIGHT
+* SUBSTRING
+* CHARINDEX (подстрока, строка)
+* REVERSE
+* REPLACE
+* ISUMERIC
+* SOUNDEX
+
+#### Функции даты-времени
+* DATENAME(часть даты)
+...
+и вообще здесь много разных функций, просто мне лень писать. 
+лучше загугли.
